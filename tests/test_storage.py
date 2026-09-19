@@ -1,0 +1,62 @@
+from pathlib import Path
+
+import pytest
+
+from cao_anh_ref.storage import Storage
+
+
+@pytest.fixture
+def storage(tmp_path: Path) -> Storage:
+    return Storage(tmp_path / "index.sqlite3")
+
+
+def test_insert_and_get(storage: Storage) -> None:
+    record = storage.insert(
+        project="test-project",
+        source="pinterest",
+        local_path="/tmp/foo.jpg",
+        content_hash="abc123",
+        keyword="moody neon",
+        tags=["night", "blue"],
+        dominant_colors=["#000011", "#112233"],
+    )
+
+    fetched = storage.get(record.id)
+    assert fetched is not None
+    assert fetched.project == "test-project"
+    assert fetched.keyword == "moody neon"
+    assert fetched.tags == ["night", "blue"]
+    assert fetched.dominant_colors == ["#000011", "#112233"]
+
+
+def test_get_missing_returns_none(storage: Storage) -> None:
+    assert storage.get("does-not-exist") is None
+
+
+def test_find_by_hash_dedup(storage: Storage) -> None:
+    record = storage.insert(
+        project="p1", source="pinterest", local_path="/tmp/a.jpg", content_hash="samehash"
+    )
+    found = storage.find_by_hash("samehash")
+    assert found is not None
+    assert found.id == record.id
+
+    assert storage.find_by_hash("nope") is None
+
+
+def test_duplicate_content_hash_raises(storage: Storage) -> None:
+    storage.insert(project="p1", source="pinterest", local_path="/tmp/a.jpg", content_hash="dup")
+    with pytest.raises(Exception):
+        storage.insert(project="p1", source="pinterest", local_path="/tmp/b.jpg", content_hash="dup")
+
+
+def test_list_by_project_filters_and_orders(storage: Storage) -> None:
+    storage.insert(project="p1", source="pinterest", local_path="/tmp/1.jpg", content_hash="h1")
+    storage.insert(project="p2", source="pinterest", local_path="/tmp/2.jpg", content_hash="h2")
+    storage.insert(project="p1", source="pinterest", local_path="/tmp/3.jpg", content_hash="h3")
+
+    results = storage.list_by_project("p1")
+    assert len(results) == 2
+    assert {r.local_path for r in results} == {"/tmp/1.jpg", "/tmp/3.jpg"}
+
+    assert storage.list_by_project("no-such-project") == []
