@@ -1,0 +1,83 @@
+"""Eyecandy (eyecannndy.com) adapter - thu vien GIF/video minh hoa ky thuat
+quay/dung phim (crash zoom, dutch angle, split diopter...). Khong can dang
+nhap. Trang dung HTMX: go tu khoa vao o tim kiem, doi ~0.5s, ket qua tu cap
+nhat trong DOM - can Playwright de cho JS chay, khong the doc bang requests
+thuan.
+
+LUU Y: cac selector duoi day lay tu Inspect Element thuc te tren trang (khong
+phai doan mo), nhung eyecannndy.com van co the doi giao dien theo thoi gian -
+neu search tra ve 0 ket qua, mo DevTools tren trang that de kiem tra lai.
+"""
+
+from __future__ import annotations
+
+from playwright.sync_api import Page, sync_playwright
+
+from .base import ImageResult
+
+SEARCH_URL = "https://eyecannndy.com/"
+SELECTOR_SEARCH_INPUT = 'input.search-input[name="q"]'
+SELECTOR_GRID_ITEM_IMG = "div.grid-item img.lazy-img"
+
+SEARCH_DEBOUNCE_MS = 800  # trang dung hx-trigger delay:500ms, cho du du
+
+
+class EyecandyAdapter:
+    name = "eyecandy"
+
+    def search(self, keyword: str, limit: int) -> list[ImageResult]:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(SEARCH_URL, wait_until="networkidle")
+
+            results = parse_search_results(page, keyword, limit)
+
+            browser.close()
+
+        return results
+
+
+def parse_search_results(page: Page, keyword: str, limit: int) -> list[ImageResult]:
+    """Go tu khoa vao o tim kiem (neu co tren `page`), doi ket qua, doc luoi anh.
+
+    Tach rieng khoi search() de test duoc bang fixture HTML tinh (file://).
+    """
+    search_box = page.query_selector(SELECTOR_SEARCH_INPUT)
+    if search_box is not None:
+        search_box.click()
+        search_box.fill(keyword)
+        page.wait_for_timeout(SEARCH_DEBOUNCE_MS)
+
+    return parse_grid_items(page, limit)
+
+
+def parse_grid_items(page: Page, limit: int) -> list[ImageResult]:
+    results: dict[str, ImageResult] = {}
+
+    imgs = page.query_selector_all(SELECTOR_GRID_ITEM_IMG)
+    for img in imgs:
+        if len(results) >= limit:
+            break
+
+        src = img.get_attribute("src") or img.get_attribute("data-src")
+        if not src:
+            continue
+
+        # Khong co permalink clip on dinh tren trang - dung ten file lam id.
+        result_id = src.rsplit("/", 1)[-1]
+        if result_id in results:
+            continue
+
+        title = img.get_attribute("title") or img.get_attribute("alt") or ""
+
+        results[result_id] = ImageResult(
+            result_id=result_id,
+            source="eyecandy",
+            thumbnail_url=src,
+            full_url=src,
+            source_page_url=SEARCH_URL,
+            title=title,
+        )
+
+    return list(results.values())[:limit]

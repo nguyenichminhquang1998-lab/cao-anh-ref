@@ -13,6 +13,7 @@ from mcp.server.fastmcp import FastMCP, Image
 from .config import settings
 from .downloader import download_image
 from .sources.base import ImageResult, SourceAdapter
+from .sources.eyecandy import EyecandyAdapter
 from .sources.pinterest import PinterestAdapter
 from .storage import ImageRecord, Storage
 
@@ -22,6 +23,7 @@ storage = Storage(settings.db_path)
 
 _adapters: dict[str, SourceAdapter] = {
     "pinterest": PinterestAdapter(settings.storage_state_path),
+    "eyecandy": EyecandyAdapter(),
 }
 
 # Cache ket qua search trong phien lam viec hien tai, de download_images co
@@ -55,7 +57,10 @@ def _record_to_dict(record: ImageRecord) -> dict:
 
 @mcp.tool()
 def search_images(query: str, source: str = "pinterest", limit: int = 20) -> list[dict]:
-    """Tim anh reference theo tu khoa tren nguon chi dinh (mac dinh pinterest).
+    """Tim anh reference theo tu khoa tren nguon chi dinh.
+
+    source: "pinterest" (mac dinh, anh) hoac "eyecandy" (GIF/video minh hoa
+    ky thuat quay/dung phim, tu eyecannndy.com).
 
     Tra ve danh sach candidate (result_id, thumbnail_url, source_page_url,
     title). Dung result_id nay voi download_images() de tai anh ve may.
