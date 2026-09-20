@@ -45,8 +45,14 @@ def download_image(
     keyword: str | None = None,
     source_page_url: str | None = None,
     tags: list[str] | None = None,
+    destination_folder: str | None = None,
 ) -> tuple[ImageRecord, bool]:
-    """Tai 1 anh ve <root>/moodboards/<project>/, ghi index.
+    """Tai 1 anh ve dia, ghi index.
+
+    Mac dinh luu vao <root>/moodboards/<project>/. Neu truyen destination_folder
+    (duong dan tuyet doi tren may nguoi dung, vd thu muc du an khach hang) thi
+    luu thang vao do thay vi thu muc mac dinh - "project" van duoc dung de ghi
+    nhan trong index (list_moodboard, dedupe), chi khac noi luu file vat ly.
 
     Tra ve (record, is_new). is_new=False nghia la anh da ton tai (dedupe
     theo content-hash) - record tra ve la ban ghi cu, khong tai lai.
@@ -68,7 +74,10 @@ def download_image(
         ext = guessed or ".jpg"
 
     project_slug = _slugify(project)
-    project_dir = settings.moodboards_dir / project_slug
+    if destination_folder:
+        project_dir = Path(destination_folder).expanduser()
+    else:
+        project_dir = settings.moodboards_dir / project_slug
     project_dir.mkdir(parents=True, exist_ok=True)
 
     local_path = project_dir / f"{content_hash[:16]}{ext}"

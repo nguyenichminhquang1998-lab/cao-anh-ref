@@ -78,11 +78,15 @@ def download_images(
     result_ids: list[str] | None = None,
     urls: list[str] | None = None,
     tags: list[str] | None = None,
+    destination_folder: str | None = None,
 ) -> dict:
     """Tai anh ve local va ghi vao index cua project.
 
     - result_ids: cac result_id lay tu search_images() (uu tien, tai ban full-res)
     - urls: URL anh truc tiep, dung khi khong qua search_images()
+    - destination_folder: duong dan thu muc tuyet doi tren may (vd thu muc du an
+      khach hang cu the) de luu anh thang vao do, thay vi thu muc mac dinh
+      <root>/moodboards/<project>/. "project" van dung de ghi nhan trong index.
 
     Anh trung noi dung (content-hash) voi anh da co se duoc bo qua, khong tai
     lai. Tra ve danh sach anh moi tai va anh da ton tai tu truoc.
@@ -107,6 +111,7 @@ def download_images(
                 keyword=keyword,
                 source_page_url=page_url,
                 tags=tags,
+                destination_folder=destination_folder,
             )
         except Exception as exc:  # noqa: BLE001 - bao loi ve cho Claude, khong chan ca batch
             errors.append({"url": url, "error": str(exc)})
