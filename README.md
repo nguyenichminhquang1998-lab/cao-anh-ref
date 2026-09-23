@@ -54,6 +54,12 @@ khac neu file da co san):
 Luu file, roi tat han va mo lai app Claude Desktop (khong chi dong cua so -
 can tat han qua Task Manager hoac tuong duong) de nap lai cau hinh MCP.
 
+## Cap nhat code (Windows)
+
+Nhay dup `update.bat` o thu muc goc du an. Script tu tai ban moi nhat tu
+GitHub, tat Claude Desktop, chep de code (giu nguyen `.venv` va `.env`), cai
+them thu vien neu co, roi mo lai Claude Desktop.
+
 ## Cac MCP tool
 
 - `search_images(query, source="pinterest", limit=20)` — tim anh theo tu khoa.
