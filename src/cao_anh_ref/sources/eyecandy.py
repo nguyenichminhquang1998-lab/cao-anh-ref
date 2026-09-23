@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from playwright.sync_api import Page, sync_playwright
 
-from .base import ImageResult, run_with_watchdog
+from .base import DESKTOP_USER_AGENT, HIDE_WEBDRIVER_SCRIPT, ImageResult, run_with_watchdog
 
 SEARCH_URL = "https://eyecannndy.com/"
 SELECTOR_SEARCH_INPUT = 'input.search-input[name="q"]'
@@ -21,17 +21,6 @@ SELECTOR_GRID_ITEM_IMG = "div.grid-item img.lazy-img"
 
 SEARCH_DEBOUNCE_MS = 800  # trang dung hx-trigger delay:500ms, cho du du
 PAGE_LOAD_TIMEOUT_MS = 20000
-
-# Trang tra ve rong khi bi nhan dien la trinh duyet tu dong hoa (headless), du
-# tren trinh duyet that van hien binh thuong. De vuot qua, robot chay o che do
-# "hien cua so" (khong headless) - giong het nguoi dung that, khong bi cac dau
-# hieu headless thong thuong phat hien - kem gia lap them vai dau hieu "nguoi
-# that" phong khi trang kiem tra ky hon.
-DESKTOP_USER_AGENT = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
-)
-HIDE_WEBDRIVER_SCRIPT = "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
 
 
 class EyecandyAdapter:

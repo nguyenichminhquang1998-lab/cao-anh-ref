@@ -64,8 +64,12 @@ can tat han qua Task Manager hoac tuong duong) de nap lai cau hinh MCP.
   `destination_folder` (duong dan tuyet doi, vd thu muc du an khach hang cu
   the) thi luu thang vao do thay vi thu muc mac dinh. Tu dong bo qua anh
   trung noi dung (dedupe theo content-hash).
+  Moi file tai ve deu duoc kiem tra la anh that (khong phai trang loi HTML,
+  khong phai anh giu cho 1x1) truoc khi luu - file khong dat bi bao loi, khong
+  vao kho.
 - `list_moodboard(project)` — liet ke anh da luu trong 1 du an
 - `get_image(image_id)` — Claude xem truc tiep anh de phan tich mood/mau/composition
+- `delete_image(image_id)` — xoa 1 anh khoi kho (ca index lan file tren dia)
 
 ### Do tin cay theo tung nguon (source)
 

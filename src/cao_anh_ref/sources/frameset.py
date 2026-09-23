@@ -15,8 +15,8 @@ import time
 
 from playwright.sync_api import Page, sync_playwright
 
-from .base import ImageResult, run_with_watchdog
-from .eyecandy import DESKTOP_USER_AGENT, HIDE_WEBDRIVER_SCRIPT
+from ..downloader import validate_image_bytes
+from .base import DESKTOP_USER_AGENT, HIDE_WEBDRIVER_SCRIPT, ImageResult, run_with_watchdog
 
 SEARCH_URL = "https://frameset.app/search"
 SELECTOR_SEARCH_INPUT = 'input[data-sentry-element="AutocompleteInput"]'
@@ -25,13 +25,16 @@ SELECTOR_RESULT_IMG = 'img[src*="cloudfront.net"]'
 PAGE_LOAD_TIMEOUT_MS = 20000
 RESULTS_CHANGE_TIMEOUT_S = 15
 POLL_INTERVAL_MS = 500
+IMAGE_FETCH_TIMEOUT_MS = 15000
+# Lau hon cac nguon khac vi con tai san anh trong trinh duyet sau khi tim.
+WATCHDOG_SECONDS = 120
 
 
 class FramesetAdapter:
     name = "frameset"
 
     def search(self, keyword: str, limit: int) -> list[ImageResult]:
-        return run_with_watchdog(lambda: self._search(keyword, limit))
+        return run_with_watchdog(lambda: self._search(keyword, limit), timeout_seconds=WATCHDOG_SECONDS)
 
     def _search(self, keyword: str, limit: int) -> list[ImageResult]:
         with sync_playwright() as pw:
@@ -54,10 +57,41 @@ class FramesetAdapter:
                     pass
 
                 results = run_search(page, keyword, limit)
+                # Tai anh ngay trong trinh duyet (co cookie + Referer cua trang):
+                # request tran tu ngoai bi CDN tra ve cung 1 noi dung rac cho moi link.
+                results = attach_image_bytes(context, results)
             finally:
                 browser.close()
 
         return results
+
+
+def attach_image_bytes(context, results: list[ImageResult]) -> list[ImageResult]:
+    """Tai byte anh cho tung ket qua qua `context.request` (dung chung cookie voi
+    trinh duyet), bo ket qua nao khong ra anh that. Raise neu khong con cai nao."""
+    kept: list[ImageResult] = []
+    for result in results:
+        try:
+            response = context.request.get(
+                result.full_url,
+                headers={"Referer": SEARCH_URL},
+                timeout=IMAGE_FETCH_TIMEOUT_MS,
+            )
+            if not response.ok:
+                continue
+            body = response.body()
+            validate_image_bytes(body, response.headers.get("content-type", ""))
+        except Exception:
+            continue
+        result.content = body
+        kept.append(result)
+
+    if results and not kept:
+        raise RuntimeError(
+            f"Tim thay {len(results)} ket qua tren Frameset nhung khong tai duoc anh that nao "
+            "(trang chan tai truc tiep hoac chi tra ve anh giu cho)."
+        )
+    return kept
 
 
 def _current_srcs(page: Page) -> list[str]:

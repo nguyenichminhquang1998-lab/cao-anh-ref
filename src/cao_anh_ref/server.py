@@ -1,4 +1,4 @@
-"""MCP server: search_images, download_images, list_moodboard, get_image.
+"""MCP server: search_images, download_images, list_moodboard, get_image, delete_image.
 
 Chay local, ket noi qua stdio voi Claude Desktop/Claude Code:
     claude mcp add cao-anh-ref -- python -m cao_anh_ref.server
@@ -7,6 +7,7 @@ Chay local, ket noi qua stdio voi Claude Desktop/Claude Code:
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP, Image
 
@@ -109,7 +110,13 @@ def download_images(
     skipped_existing: list[dict] = []
     errors: list[dict] = []
 
-    def _do_download(url: str, source: str, keyword: str | None, page_url: str | None) -> None:
+    def _do_download(
+        url: str,
+        source: str,
+        keyword: str | None,
+        page_url: str | None,
+        content: bytes | None = None,
+    ) -> None:
         try:
             record, is_new = download_image(
                 settings=settings,
@@ -121,6 +128,7 @@ def download_images(
                 source_page_url=page_url,
                 tags=tags,
                 destination_folder=destination_folder,
+                content=content,
             )
         except Exception as exc:  # noqa: BLE001 - bao loi ve cho Claude, khong chan ca batch
             errors.append({"url": url, "error": str(exc)})
@@ -134,7 +142,7 @@ def download_images(
                 {"result_id": result_id, "error": "Khong tim thay trong search cache. Search lai truoc khi tai."}
             )
             continue
-        _do_download(cached.full_url, cached.source, None, cached.source_page_url)
+        _do_download(cached.full_url, cached.source, None, cached.source_page_url, cached.content)
 
     for url in urls:
         _do_download(url, "manual", None, None)
@@ -169,6 +177,22 @@ def get_image(image_id: str) -> list:
         ensure_ascii=False,
     )
     return [metadata, Image(path=record.local_path)]
+
+
+@mcp.tool()
+def delete_image(image_id: str) -> dict:
+    """Xoa 1 anh khoi kho: xoa khoi index va xoa file tren dia.
+
+    Dung khi anh tai ve bi loi hoac khong dung y. Lay image_id tu
+    list_moodboard() hoac ket qua download_images().
+    """
+    record = storage.get(image_id)
+    if record is None:
+        raise ValueError(f"Khong tim thay anh id={image_id}")
+
+    Path(record.local_path).unlink(missing_ok=True)
+    storage.delete(image_id)
+    return {"deleted": image_id, "local_path": record.local_path}
 
 
 def main() -> None:

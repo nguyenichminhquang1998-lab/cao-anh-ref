@@ -4,12 +4,20 @@ Frameset, Xinpianchang...). Them nguon moi = them 1 class implement search()."""
 from __future__ import annotations
 
 import concurrent.futures
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Protocol, TypeVar
 
 T = TypeVar("T")
 
 SEARCH_WATCHDOG_SECONDS = 45
+
+# Gia lap trinh duyet that - mot so trang/CDN chan hoac tra ve rong cho
+# trinh duyet tu dong hoa / request khong giong trinh duyet.
+DESKTOP_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+)
+HIDE_WEBDRIVER_SCRIPT = "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
 
 
 def run_with_watchdog(func: Callable[[], T], timeout_seconds: float = SEARCH_WATCHDOG_SECONDS) -> T:
@@ -36,6 +44,10 @@ class ImageResult:
     full_url: str
     source_page_url: str
     title: str = ""
+    # Byte anh da tai san ben trong trinh duyet luc tim (co cookie/nguon trang
+    # hop le). Dung cho trang chan tai truc tiep - khi co, downloader dung luon
+    # thay vi tai lai bang request tran.
+    content: bytes | None = field(default=None, repr=False)
 
 
 class SourceAdapter(Protocol):

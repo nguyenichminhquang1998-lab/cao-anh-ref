@@ -140,6 +140,10 @@ class Storage:
             row = conn.execute("SELECT * FROM images WHERE id = ?", (image_id,)).fetchone()
             return ImageRecord.from_row(row) if row else None
 
+    def delete(self, image_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM images WHERE id = ?", (image_id,))
+
     def list_by_project(self, project: str) -> list[ImageRecord]:
         with self._connect() as conn:
             rows = conn.execute(
