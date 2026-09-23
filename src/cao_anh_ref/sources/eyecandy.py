@@ -81,7 +81,11 @@ def parse_search_results(page: Page, keyword: str, limit: int) -> list[ImageResu
     """
     search_box = page.locator(SELECTOR_SEARCH_INPUT).first
     if search_box.count() > 0:
-        search_box.click()
+        # focus() thay vi click(): click() doi hoi phan tu phai "nhin thay ro"
+        # (visible, khong bi che, on dinh vi tri) truoc khi bam, neu khong se
+        # cho toi khi timeout. focus() dat con tro vao o bang lenh truc tiep,
+        # khong doi hoi dieu kien hien thi do - it de bi treo hon.
+        search_box.focus()
         # Trang dung hx-trigger="keyup" de kich hoat tim kiem - fill() chi "dat"
         # gia tri vao o, khong phat sinh su kien go phim that nen khong kich hoat
         # duoc HTMX. press_sequentially() go tung ky tu that, kich hoat dung.
