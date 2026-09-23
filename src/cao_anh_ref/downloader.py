@@ -104,6 +104,7 @@ def download_image(
     tags: list[str] | None = None,
     destination_folder: str | None = None,
     content: bytes | None = None,
+    title: str = "",
 ) -> tuple[ImageRecord, bool]:
     """Tai 1 anh ve dia, ghi index.
 
@@ -155,5 +156,6 @@ def download_image(
         source_page_url=source_page_url,
         tags=tags,
         dominant_colors=dominant_colors,
+        title=title,
     )
     return record, True

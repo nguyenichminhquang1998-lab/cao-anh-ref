@@ -3,8 +3,9 @@
 tim anh ref phuc vu viec lam kich ban tu dong
 
 MCP server chay local, cho phep Claude tim & tai anh reference (Pinterest,
-Eyecandy) ve may, luu co to chuc theo tung du an, va tu xem lai anh de phan
-tich mood/mau sac/composition — ho tro lam moodboard va shotlist.
+Eyecandy, Frameset) ve may, luu co to chuc theo tung du an, tu xem lai anh de
+phan tich mood/mau sac/composition, roi dung thanh trang moodboard (web) gui
+khach — ho tro lam moodboard va shotlist theo skill `media-ref-hunter`.
 
 ## Cai dat
 
@@ -73,9 +74,25 @@ them thu vien neu co, roi mo lai Claude Desktop.
   Moi file tai ve deu duoc kiem tra la anh that (khong phai trang loi HTML,
   khong phai anh giu cho 1x1) truoc khi luu - file khong dat bi bao loi, khong
   vao kho.
-- `list_moodboard(project)` — liet ke anh da luu trong 1 du an
+- `list_moodboard(project)` — liet ke anh da luu trong 1 du an (kem `file_exists`
+  de biet file tren dia con hay da mat)
 - `get_image(image_id)` — Claude xem truc tiep anh de phan tich mood/mau/composition
 - `delete_image(image_id)` — xoa 1 anh khoi kho (ca index lan file tren dia)
+- `annotate_image(image_id, lay_gi, nhom, mood="", mo_ta="", ky_thuat="", nganh="")`
+  — ghi chu thich cho 1 anh sau khi da `get_image()` xem qua. `lay_gi` ("lay gi
+  tu ref nay") la cot quan trong nhat. `nhom` la ma nhom ky thuat trong kho ref
+  (vd `CAM-MOVE`, `LIGHTING`, `COLOR-GRADE`...), nhan ca dang rut gon lan day du.
+- `annotate_images(items=[{...}])` — ban gop nhieu anh trong 1 lan goi.
+- `build_moodboard(project, title, brief_summary="", mood="", keywords=[], image_ids=None, output_folder=None)`
+  — dung trang moodboard (web, dark theme) tu cac anh da annotate. Sinh 2 ban
+  trong `<project>/_board/`: `index.html` + `assets/` (keo vao Netlify Drop de
+  lay link gui khach) va `moodboard-<project>.html` (1 file tu chua, gui thang
+  qua Zalo/email, mo duoc offline). GIF tu dong chuyen sang video MP4 tu phat/lap
+  de nhe hon nhieu so voi GIF goc. `image_ids` de None thi lay tat ca anh trong
+  project da co `lay_gi`.
+- `export_index(path=None)` — xuat `INDEX.csv` (toan bo kho, moi project gop
+  chung) theo dung cot trong skill media-ref-hunter: file, nhom, mo_ta, lay_gi,
+  nganh, mood, ky_thuat, nguon, ngay_luu, da_dung. Mac dinh ghi vao `<root>/INDEX.csv`.
 
 ### Do tin cay theo tung nguon (source)
 
@@ -112,9 +129,22 @@ pytest tests/
 `test_pinterest_parsing.py` va `test_eyecandy_parsing.py` chay tren fixture
 HTML tinh trong `tests/fixtures/`, khong goi mang that toi cac trang that.
 
-## Pham vi hien tai (MVP)
+## Quy trinh dung moodboard
 
-Ho tro Pinterest (full-auto) va Eyecandy (tim thu cong + tai tu dong qua
-`download_images(urls=...)` - xem phan "Do tin cay theo tung nguon" o tren).
-Cac nguon khac (Frameset, Xinpianchang...) se duoc them sau qua
-`SourceAdapter` moi trong `src/cao_anh_ref/sources/`.
+1. `search_images` + `download_images` gom ref theo tung nguon.
+2. `get_image` xem tung anh trong shortlist, roi `annotate_image`/`annotate_images`
+   ghi `lay_gi` + `nhom` (chi annotate anh da chon - `get_image` moi anh ton
+   token, dung tap trung vao shortlist thay vi toan bo ket qua tho).
+3. `build_moodboard` dung trang web + file tu chua tu cac anh da annotate.
+4. Gui khach bang link (keo thu muc `_board` vao Netlify Drop) hoac file
+   `moodboard-<project>.html` qua Zalo/email.
+5. `export_index` xuat `INDEX.csv` de dua len Google Drive chia se cho CTV.
+
+## Pham vi hien tai
+
+Ho tro Pinterest (full-auto), Frameset (full-auto, ~10 luot tim/ngay) va
+Eyecandy (tim thu cong + tai tu dong qua `download_images(urls=...)` - xem
+phan "Do tin cay theo tung nguon" o tren). Cac nguon khac (Xinpianchang,
+YouTube...) chua co adapter rieng - duyet bang Claude in Chrome roi dung
+`download_images(urls=...)` tuong tu Eyecandy. Adapter moi them qua
+`SourceAdapter` trong `src/cao_anh_ref/sources/`.

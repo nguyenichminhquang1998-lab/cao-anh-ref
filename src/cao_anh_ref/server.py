@@ -12,7 +12,10 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP, Image
 
 from .config import settings
+from .downloader import _slugify as _slugify_project
 from .downloader import download_image
+from .moodboard import build_moodboard as _build_moodboard_files
+from .moodboard import canonicalize_nhom
 from .sources.base import ImageResult, SourceAdapter
 from .sources.eyecandy import EyecandyAdapter
 from .sources.frameset import FramesetAdapter
@@ -45,7 +48,7 @@ def _result_to_dict(result: ImageResult) -> dict:
 
 
 def _record_to_dict(record: ImageRecord) -> dict:
-    return {
+    data = {
         "id": record.id,
         "project": record.project,
         "source": record.source,
@@ -57,6 +60,14 @@ def _record_to_dict(record: ImageRecord) -> dict:
         "tags": record.tags,
         "dominant_colors": record.dominant_colors,
     }
+    # Cac cot chu thich (title, mo_ta, lay_gi, nhom, mood, ky_thuat, nganh) chi
+    # them vao khi da co gia tri - bo trong de output list_moodboard/download_images
+    # gon token hon, vi phan lon anh moi tai chua duoc annotate_images() xu ly.
+    for field_name in ("title", "mo_ta", "lay_gi", "nhom", "mood", "ky_thuat", "nganh"):
+        value = getattr(record, field_name)
+        if value:
+            data[field_name] = value
+    return data
 
 
 @mcp.tool()
@@ -117,6 +128,7 @@ def download_images(
         keyword: str | None,
         page_url: str | None,
         content: bytes | None = None,
+        title: str = "",
     ) -> None:
         try:
             record, is_new = download_image(
@@ -130,6 +142,7 @@ def download_images(
                 tags=tags,
                 destination_folder=destination_folder,
                 content=content,
+                title=title,
             )
         except Exception as exc:  # noqa: BLE001 - bao loi ve cho Claude, khong chan ca batch
             errors.append({"url": url, "error": str(exc)})
@@ -143,7 +156,7 @@ def download_images(
                 {"result_id": result_id, "error": "Khong tim thay trong search cache. Search lai truoc khi tai."}
             )
             continue
-        _do_download(cached.full_url, cached.source, None, cached.source_page_url, cached.content)
+        _do_download(cached.full_url, cached.source, None, cached.source_page_url, cached.content, cached.title)
 
     for url in urls:
         _do_download(url, "manual", None, None)
@@ -183,6 +196,154 @@ def get_image(image_id: str) -> list:
         ensure_ascii=False,
     )
     return [metadata, Image(path=record.local_path)]
+
+
+@mcp.tool()
+def annotate_image(
+    image_id: str,
+    lay_gi: str,
+    nhom: str,
+    mood: str = "",
+    mo_ta: str = "",
+    ky_thuat: str = "",
+    nganh: str = "",
+) -> dict:
+    """Ghi chu thich cho 1 anh sau khi da get_image() xem qua - de dung cho
+    build_moodboard() va export_index().
+
+    lay_gi: BAT BUOC va la cot quan trong nhat - "lay gi tu ref nay", vd
+    "anh sang neon ha mau len da mau". Khong co lay_gi thi anh se khong duoc
+    build_moodboard() lay tu dong (phai chi ro qua image_ids).
+    nhom: ma nhom ky thuat trong kho ref (xem references/ref-archive.md cua
+    skill media-ref-hunter): CAM-MOVE, TRANSITION, EFFECT, CAM-ANGLE, LIGHTING,
+    COLOR-GRADE, PROD-DESIGN, POSING-TALENT, MOTION-TYPO, SOUND-MUSIC,
+    FULL-CASE, MY-WORK. Nhan ca dang rut gon lan day du (vd "01_CAM-MOVE").
+    """
+    if storage.get(image_id) is None:
+        raise ValueError(f"Khong tim thay anh id={image_id}")
+    updated = storage.update_annotation(
+        image_id,
+        lay_gi=lay_gi,
+        nhom=canonicalize_nhom(nhom) if nhom else "",
+        mood=mood,
+        mo_ta=mo_ta,
+        ky_thuat=ky_thuat,
+        nganh=nganh,
+    )
+    return _record_to_dict(updated)
+
+
+@mcp.tool()
+def annotate_images(items: list[dict]) -> dict:
+    """Ghi chu thich cho nhieu anh trong 1 lan goi - dung sau khi get_image()
+    lien tiep nhieu anh trong shortlist, de khong phai goi tool lap lai.
+
+    Moi item trong `items`: {"image_id": str, "lay_gi": str, "nhom": str,
+    "mood"?: str, "mo_ta"?: str, "ky_thuat"?: str, "nganh"?: str}.
+    lay_gi va nhom nen co - xem annotate_image() de biet y nghia.
+    """
+    updated: list[dict] = []
+    errors: list[dict] = []
+    for item in items:
+        image_id = item.get("image_id", "")
+        if not image_id:
+            errors.append({"item": item, "error": "Thieu image_id"})
+            continue
+        try:
+            if storage.get(image_id) is None:
+                raise ValueError(f"Khong tim thay anh id={image_id}")
+            nhom_value = item.get("nhom", "")
+            record = storage.update_annotation(
+                image_id,
+                lay_gi=item.get("lay_gi", ""),
+                nhom=canonicalize_nhom(nhom_value) if nhom_value else "",
+                mood=item.get("mood", ""),
+                mo_ta=item.get("mo_ta", ""),
+                ky_thuat=item.get("ky_thuat", ""),
+                nganh=item.get("nganh", ""),
+            )
+            updated.append(_record_to_dict(record))
+        except Exception as exc:  # noqa: BLE001 - bao loi tung anh, khong chan ca batch
+            errors.append({"image_id": image_id, "error": str(exc)})
+    return {"updated": updated, "errors": errors}
+
+
+@mcp.tool()
+def build_moodboard(
+    project: str,
+    title: str,
+    brief_summary: str = "",
+    mood: str = "",
+    keywords: list[str] | None = None,
+    image_ids: list[str] | None = None,
+    output_folder: str | None = None,
+) -> dict:
+    """Dung trang moodboard (web) tu cac anh da annotate_image/annotate_images.
+
+    Sinh 2 ban trong <output_folder hoac moodboards/<project>>/_board/:
+    - index.html + assets/ - keo tha thu muc nay vao Netlify Drop
+      (app.netlify.com/drop) de lay link gui khach; GIF tu chay duoi dang video.
+    - moodboard-<project>.html - 1 file gui thang qua Zalo/email, mo duoc
+      offline khong can internet.
+
+    image_ids: danh sach anh theo DUNG THU TU muon hien (vd 8-15 anh XQuang
+    da chon). Bo trong thi lay toan bo anh trong project da co chu thich
+    lay_gi (dung list_moodboard() truoc de xem anh nao da annotate).
+
+    Tra ve duong dan 2 ban, dung luong ban tu chua, va canh bao neu file tu
+    chua vuot ~25MB (gioi han pho bien cua Gmail/Zalo khi gui dinh kem).
+    """
+    if image_ids:
+        records = storage.get_many(image_ids)
+        missing = set(image_ids) - {r.id for r in records}
+        if missing:
+            raise ValueError(f"Khong tim thay {len(missing)} anh trong image_ids: {sorted(missing)}")
+    else:
+        records = [r for r in storage.list_by_project(project) if r.lay_gi]
+        if not records:
+            raise ValueError(
+                f"Project '{project}' chua co anh nao duoc annotate (lay_gi trong). "
+                "Dung annotate_image/annotate_images truoc, hoac truyen image_ids ro rang."
+            )
+
+    output_root = Path(output_folder).expanduser() if output_folder else settings.moodboards_dir / _slugify_project(project)
+
+    return _build_moodboard_files(
+        project=project,
+        title=title,
+        records=records,
+        output_root=output_root,
+        brief_summary=brief_summary,
+        mood=mood,
+        keywords=keywords or [],
+    )
+
+
+@mcp.tool()
+def export_index(path: str | None = None) -> dict:
+    """Xuat INDEX.csv cho toan bo kho anh (moi project gop chung), dung cot
+    theo dung quy uoc trong skill media-ref-hunter (references/ref-archive.md):
+    file, nhom, mo_ta, lay_gi, nganh, mood, ky_thuat, nguon, ngay_luu, da_dung.
+
+    path: duong dan file dich, mac dinh <root>/INDEX.csv. Mo duoc bang Excel,
+    hoac day len Google Drive de chia se cho CTV.
+    """
+    import csv
+
+    dest = Path(path).expanduser() if path else settings.root / "INDEX.csv"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    records = storage.list_all()
+    with dest.open("w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            ["file", "nhom", "mo_ta", "lay_gi", "nganh", "mood", "ky_thuat", "nguon", "ngay_luu", "da_dung"]
+        )
+        for r in records:
+            writer.writerow(
+                [r.local_path, r.nhom, r.mo_ta, r.lay_gi, r.nganh, r.mood, r.ky_thuat, r.source, r.downloaded_at[:10], r.project]
+            )
+    return {"path": str(dest), "row_count": len(records)}
 
 
 @mcp.tool()
