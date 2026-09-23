@@ -33,12 +33,18 @@ if (-not $Extracted -or -not (Test-Path (Join-Path $Extracted.FullName 'src\cao_
 }
 
 Step "3/5 Tat Claude Desktop va server cu..."
-$ClaudeExe = (Get-Process -Name claude -ErrorAction SilentlyContinue | Select-Object -First 1).Path
-Get-Process -Name claude -ErrorAction SilentlyContinue | Stop-Process -Force
-Get-Process -Name python, chrome, chromium -ErrorAction SilentlyContinue |
-    Where-Object { $_.Path -and $_.Path.StartsWith($ProjectDir, [StringComparison]::OrdinalIgnoreCase) } |
-    Stop-Process -Force
-Start-Sleep -Seconds 2
+$ClaudeExe = (Get-Process -Name claude -ErrorAction SilentlyContinue | Where-Object Path | Select-Object -First 1).Path
+# Co tien trinh "claude" chay quyen he thong (Access denied) - khong can tat, bo qua.
+Get-Process -Name claude -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+# python.exe cua venv chi la launcher; tien trinh that nam o thu muc Python goc, nen loc theo dong lenh.
+Get-CimInstance Win32_Process -Filter "Name='python.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like '*cao_anh_ref*' } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+Start-Sleep -Seconds 3
+if (Get-Process -Name claude -ErrorAction SilentlyContinue | Where-Object Path) {
+    Write-Host "Claude Desktop chua tat duoc tu dong. Hay tat Claude bang tay (chuot phai icon Claude o goc phai taskbar -> Quit, hoac Task Manager), roi quay lai day nhan Enter." -ForegroundColor Yellow
+    Read-Host | Out-Null
+}
 
 Step "4/5 Chep code moi de len code cu (giu nguyen .venv va .env)..."
 robocopy $Extracted.FullName $ProjectDir /E /XD .venv /XF .env /NFL /NDL /NJH /NJS /NP | Out-Null
