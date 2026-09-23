@@ -13,27 +13,36 @@ from __future__ import annotations
 
 from playwright.sync_api import Page, sync_playwright
 
-from .base import ImageResult
+from .base import ImageResult, run_with_watchdog
 
 SEARCH_URL = "https://eyecannndy.com/"
 SELECTOR_SEARCH_INPUT = 'input.search-input[name="q"]'
 SELECTOR_GRID_ITEM_IMG = "div.grid-item img.lazy-img"
 
 SEARCH_DEBOUNCE_MS = 800  # trang dung hx-trigger delay:500ms, cho du du
+PAGE_LOAD_TIMEOUT_MS = 20000
 
 
 class EyecandyAdapter:
     name = "eyecandy"
 
     def search(self, keyword: str, limit: int) -> list[ImageResult]:
+        return run_with_watchdog(lambda: self._search(keyword, limit))
+
+    def _search(self, keyword: str, limit: int) -> list[ImageResult]:
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto(SEARCH_URL, wait_until="networkidle")
+            try:
+                page = browser.new_page()
+                # "domcontentloaded" thay vi "networkidle": trang co the khong bao
+                # gio "im lang" hoan toan (quang cao/theo doi ngam), khien cho toi
+                # khi networkidle treo bat thuong lau. domcontentloaded + timeout
+                # cung dam bao khong bao gio treo vo thoi han.
+                page.goto(SEARCH_URL, wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
 
-            results = parse_search_results(page, keyword, limit)
-
-            browser.close()
+                results = parse_search_results(page, keyword, limit)
+            finally:
+                browser.close()
 
         return results
 

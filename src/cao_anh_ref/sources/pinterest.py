@@ -15,7 +15,7 @@ from pathlib import Path
 
 from playwright.sync_api import Page, sync_playwright
 
-from .base import ImageResult
+from .base import ImageResult, run_with_watchdog
 
 SEARCH_URL = "https://www.pinterest.com/search/pins/?q={query}"
 SELECTOR_PIN_CONTAINER = 'div[data-test-id="pin"]'
@@ -24,6 +24,7 @@ SELECTOR_PIN_LINK = 'a[href*="/pin/"]'
 
 SCROLL_PAUSE_MS = 800
 MAX_SCROLLS = 15
+PAGE_LOAD_TIMEOUT_MS = 20000
 
 
 class PinterestAdapter:
@@ -39,16 +40,23 @@ class PinterestAdapter:
                 "Chay `python scripts/pinterest_login.py` de dang nhap 1 lan truoc."
             )
 
+        return run_with_watchdog(lambda: self._search(keyword, limit))
+
+    def _search(self, keyword: str, limit: int) -> list[ImageResult]:
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True)
-            context = browser.new_context(storage_state=str(self.storage_state_path))
-            page = context.new_page()
-            page.goto(SEARCH_URL.format(query=keyword), wait_until="networkidle")
+            try:
+                context = browser.new_context(storage_state=str(self.storage_state_path))
+                page = context.new_page()
+                # "domcontentloaded" thay vi "networkidle": trang co quang cao/theo
+                # doi ngam co the khong bao gio "im lang" hoan toan, khien cho toi
+                # khi networkidle treo bat thuong lau. domcontentloaded + timeout
+                # cung dam bao khong bao gio treo vo thoi han.
+                page.goto(SEARCH_URL.format(query=keyword), wait_until="domcontentloaded", timeout=PAGE_LOAD_TIMEOUT_MS)
 
-            results = parse_search_page(page, limit)
-
-            context.close()
-            browser.close()
+                results = parse_search_page(page, limit)
+            finally:
+                browser.close()
 
         return results
 
