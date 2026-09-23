@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+<body>
+  <input type="text" data-sentry-element="AutocompleteInput" />
+  <div id="grid">
+    <img src="https://d13mry19xv19vu.cloudfront.net/default-1_thumb.jpg" alt="Default 1" />
+    <img src="https://d13mry19xv19vu.cloudfront.net/default-2_thumb.jpg" alt="Default 2" />
+  </div>
+  <script>
+    const input = document.querySelector("input");
+    input.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || window.NO_RESULTS) return;
+      setTimeout(() => {
+        document.getElementById("grid").innerHTML =
+          '<img src="https://d13mry19xv19vu.cloudfront.net/r1_thumb.jpg" alt="Result 1" />' +
+          '<img src="https://d13mry19xv19vu.cloudfront.net/default-1_thumb.jpg" alt="Default 1" />' +
+          '<img src="https://d13mry19xv19vu.cloudfront.net/r2_thumb.jpg" alt="Result 2" />';
+      }, 300);
+    });
+  </script>
+</body>
+</html>

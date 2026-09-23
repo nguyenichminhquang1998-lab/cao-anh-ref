@@ -78,6 +78,11 @@ can tat han qua Task Manager hoac tuong duong) de nap lai cau hinh MCP.
   "Claude in Chrome" neu co) de tim link anh/GIF that, roi goi
   `download_images(urls=[...], project=...)` truc tiep — bo qua buoc
   `search_images` tu dong. Cach nay da xac nhan chay tot end-to-end.
+- **frameset** — `search_images(source="frameset")` tim tren frameset.app
+  (khung hinh phim/TVC/MV), khong can dang nhap. **Ban mien phi chi ~10 luot
+  tim/ngay**, moi lan goi ton 1 luot: nen gop y vao 1 tu khoa tot thay vi goi
+  lien tuc. Khi het luot, tool bao loi ro rang thay vi tra ve rong. Moi lan
+  tim se hien 1 cua so Chrome vai giay (chu y, de khong bi chan).
 
 ## Test nhanh khong qua Claude
 
