@@ -22,6 +22,17 @@ SELECTOR_GRID_ITEM_IMG = "div.grid-item img.lazy-img"
 SEARCH_DEBOUNCE_MS = 800  # trang dung hx-trigger delay:500ms, cho du du
 PAGE_LOAD_TIMEOUT_MS = 20000
 
+# Trang tra ve rong khi bi nhan dien la trinh duyet tu dong hoa (headless), du
+# tren trinh duyet that van hien binh thuong. De vuot qua, robot chay o che do
+# "hien cua so" (khong headless) - giong het nguoi dung that, khong bi cac dau
+# hieu headless thong thuong phat hien - kem gia lap them vai dau hieu "nguoi
+# that" phong khi trang kiem tra ky hon.
+DESKTOP_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+)
+HIDE_WEBDRIVER_SCRIPT = "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+
 
 class EyecandyAdapter:
     name = "eyecandy"
@@ -31,9 +42,17 @@ class EyecandyAdapter:
 
     def _search(self, keyword: str, limit: int) -> list[ImageResult]:
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True)
+            # headless=False: chay hien cua so that (khong an), de khong bi trang
+            # nhan dien la robot tu dong hoa va tra ve trang rong.
+            browser = pw.chromium.launch(headless=False)
             try:
-                page = browser.new_page()
+                context = browser.new_context(
+                    user_agent=DESKTOP_USER_AGENT,
+                    viewport={"width": 1280, "height": 800},
+                    locale="en-US",
+                )
+                context.add_init_script(HIDE_WEBDRIVER_SCRIPT)
+                page = context.new_page()
                 # "domcontentloaded" thay vi "networkidle": trang co the khong bao
                 # gio "im lang" hoan toan (quang cao/theo doi ngam), khien cho toi
                 # khi networkidle treo bat thuong lau. domcontentloaded + timeout
