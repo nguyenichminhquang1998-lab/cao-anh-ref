@@ -82,6 +82,16 @@ def _fetch(url: str, referer: str | None, settings: Settings) -> tuple[bytes, st
     return response.content, response.headers.get("content-type", "")
 
 
+def _write_verified(path: Path, content: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+    if not path.exists() or path.stat().st_size != len(content):
+        raise OSError(
+            f"Da ghi file {path} nhung doc lai khong thay/khong du dung luong - "
+            "co the phan mem diet virus hoac 'Controlled folder access' cua Windows dang chan ghi."
+        )
+
+
 def download_image(
     *,
     settings: Settings,
@@ -117,17 +127,21 @@ def download_image(
     content_hash = hashlib.sha256(content).hexdigest()
     existing = storage.find_by_hash(content_hash)
     if existing is not None:
-        return existing, False
+        existing_path = Path(existing.local_path)
+        if existing_path.exists():
+            return existing, False
+        # Index con ban ghi nhung file tren dia da mat (bi xoa/di chuyen ngoai tool):
+        # ghi lai file vao dung cho cu, neu khong anh nay se bi "trung" mai mai va khong tai lai duoc.
+        _write_verified(existing_path, content)
+        return existing, True
 
     project_slug = _slugify(project)
     if destination_folder:
         project_dir = Path(destination_folder).expanduser()
     else:
         project_dir = settings.moodboards_dir / project_slug
-    project_dir.mkdir(parents=True, exist_ok=True)
-
     local_path = project_dir / f"{content_hash[:16]}{ext}"
-    local_path.write_bytes(content)
+    _write_verified(local_path, content)
 
     dominant_colors = extract_dominant_colors(local_path)
 

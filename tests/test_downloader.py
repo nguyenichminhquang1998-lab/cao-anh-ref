@@ -87,6 +87,23 @@ def test_distinct_images_are_not_collapsed(env) -> None:
     assert len(storage.list_by_project("p")) == 3
 
 
+def test_redownload_restores_file_missing_from_disk(env) -> None:
+    settings, storage = env
+    content = _image_bytes((64, 64))
+    kwargs = dict(settings=settings, storage=storage, url="https://cdn.example/a.webp", project="p", source="frameset")
+
+    record, _ = download_image(content=content, **kwargs)
+    Path(record.local_path).unlink()
+
+    restored, is_new = download_image(content=content, **kwargs)
+    assert is_new
+    assert restored.id == record.id
+    assert Path(restored.local_path).read_bytes() == content
+
+    _, is_new_again = download_image(content=content, **kwargs)
+    assert not is_new_again
+
+
 def test_storage_delete(env) -> None:
     settings, storage = env
     record, _ = download_image(

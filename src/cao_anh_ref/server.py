@@ -52,6 +52,7 @@ def _record_to_dict(record: ImageRecord) -> dict:
         "keyword": record.keyword,
         "source_page_url": record.source_page_url,
         "local_path": record.local_path,
+        "file_exists": Path(record.local_path).exists(),
         "downloaded_at": record.downloaded_at,
         "tags": record.tags,
         "dominant_colors": record.dominant_colors,
@@ -165,6 +166,11 @@ def get_image(image_id: str) -> list:
     record = storage.get(image_id)
     if record is None:
         raise ValueError(f"Khong tim thay anh id={image_id}")
+    if not Path(record.local_path).exists():
+        raise ValueError(
+            f"Index co anh id={image_id} nhung file {record.local_path} khong con tren dia "
+            "(bi xoa/di chuyen ngoai tool). Tim + download_images lai anh do se tu khoi phuc file."
+        )
 
     metadata = json.dumps(
         {
