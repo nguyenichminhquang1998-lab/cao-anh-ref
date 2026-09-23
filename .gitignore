@@ -7,3 +7,4 @@ venv/
 .env
 *storage_state.json
 *.sqlite3
+.update-tmp/
