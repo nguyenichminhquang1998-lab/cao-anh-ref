@@ -26,15 +26,45 @@ if (-not (Test-Path $Python)) {
 Write-Host "Dung: $Python" -ForegroundColor Green
 
 Step "2/3 Tim file cau hinh Claude Desktop..."
+$ConfigFilename = 'claude_desktop_config.json'
 if (-not $ConfigPath) {
+    # Vi tri thong thuong.
     $Candidates = @(
-        (Join-Path $env:APPDATA 'Claude\claude_desktop_config.json'),
-        (Join-Path $env:APPDATA 'Claude\config.json')
+        (Join-Path $env:APPDATA "Claude\$ConfigFilename"),
+        (Join-Path $env:LOCALAPPDATA "Claude\$ConfigFilename"),
+        (Join-Path $env:APPDATA "AnthropicClaude\$ConfigFilename"),
+        (Join-Path $env:LOCALAPPDATA "AnthropicClaude\$ConfigFilename")
     )
     $ConfigPath = $Candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
+if (-not $ConfigPath) {
+    # Ban cai tu Microsoft Store bi "ao hoa" AppData vao %LOCALAPPDATA%\Packages\<ten-goi>\...
+    # Chi do vao cac goi co ten lien quan Claude/Anthropic, khong quet toan bo Packages (rat nhieu goi khac, se cham).
+    $PackagesDir = Join-Path $env:LOCALAPPDATA 'Packages'
+    if (Test-Path $PackagesDir) {
+        $ClaudePackages = Get-ChildItem -Path $PackagesDir -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -like '*Claude*' -or $_.Name -like '*Anthropic*' }
+        foreach ($pkg in $ClaudePackages) {
+            $found = Get-ChildItem -Path $pkg.FullName -Filter $ConfigFilename -Recurse -Depth 6 -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $ConfigPath = $found.FullName; break }
+        }
+    }
+}
+if (-not $ConfigPath) {
+    # Tim rong o 2 goc quen thuoc, gioi han do sau de khong quet lan sang cac thu muc lon khong lien quan.
+    $ConfigPath = @($env:APPDATA, $env:LOCALAPPDATA) | Where-Object { $_ } | ForEach-Object {
+        Get-ChildItem -Path $_ -Filter $ConfigFilename -Recurse -Depth 3 -ErrorAction SilentlyContinue
+    } | Select-Object -First 1 -ExpandProperty FullName
+}
+
 if (-not $ConfigPath -or -not (Test-Path $ConfigPath)) {
-    Fail "Khong tu tim thay file cau hinh Claude Desktop. Hay mo Claude Desktop > Settings > Developer > Edit config, xem duong dan file hien o dau, roi chay lai script nay voi: -ConfigPath 'duong dan do'."
+    Write-Host "`nKhong tu tim thay file cau hinh. Cac thu muc co ten chua 'claude' tim duoc:" -ForegroundColor Yellow
+    $Found = @($env:APPDATA, $env:LOCALAPPDATA) | Where-Object { $_ } | ForEach-Object {
+        Get-ChildItem -Path $_ -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*claude*' }
+    }
+    if ($Found) { $Found | ForEach-Object { Write-Host " - $($_.FullName)" } }
+    else { Write-Host " (khong thay thu muc nao)" }
+    Fail "Hay mo Claude Desktop > Settings > Developer > Edit config, xem duong dan file hien o dau (hoac dung danh sach thu muc in o tren), roi chay lai script nay voi: -ConfigPath 'duong dan do'."
 }
 Write-Host "Dung: $ConfigPath" -ForegroundColor Green
 
