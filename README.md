@@ -59,7 +59,18 @@ can tat han qua Task Manager hoac tuong duong) de nap lai cau hinh MCP.
 
 Nhay dup `update.bat` o thu muc goc du an. Script tu tai ban moi nhat tu
 GitHub, tat Claude Desktop, chep de code (giu nguyen `.venv` va `.env`), cai
-them thu vien neu co, roi mo lai Claude Desktop.
+them thu vien neu co, tu sua lai duong dan trong cau hinh Claude Desktop (xem
+muc duoi), roi mo lai Claude Desktop.
+
+## Neu di chuyen/doi ten thu muc du an
+
+Claude Desktop nho duong dan toi `python.exe` tai thoi diem cai dat - di
+chuyen hoac doi ten thu muc `cao-anh-ref-claude-loving-babbage-1g7ghe` se lam
+Claude Desktop bao "command wasn't found". Chay `scripts/fix_mcp_config.ps1`
+(hoac nhay dup `update.bat` - script nay tu goi ham sua o buoc cuoi) de tu
+tim lai vi tri that va sua lai file cau hinh, khong dong toi cac MCP server
+khac (Figma, Blender, DaVinci...). Script tu do vi tri cua chinh no de tinh
+ra duong dan dung, nen chay duoc ngay ca khi thu muc da doi cho.
 
 ## Cac MCP tool
 

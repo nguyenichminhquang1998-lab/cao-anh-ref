@@ -20,7 +20,7 @@ if (-not (Test-Path $Python)) {
     Fail "Khong thay $Python. Kiem tra lai duong dan thu muc du an: $ProjectDir"
 }
 
-Step "1/5 Tai ban code moi tu GitHub..."
+Step "1/6 Tai ban code moi tu GitHub..."
 # Thu muc tam nam trong du an, khong dung %TEMP%: ten user co dau cach nen %TEMP% bi rut gon
 # kieu C:\Users\MYPC~1, va Remove-Item cua PowerShell 5.1 loi voi duong dan rut gon do.
 $Tmp = Join-Path $ProjectDir '.update-tmp'
@@ -32,7 +32,7 @@ $Zip = Join-Path $Tmp 'code.zip'
 try { Invoke-WebRequest -Uri $ZipUrl -OutFile $Zip -UseBasicParsing }
 catch { Fail "Khong tai duoc file tu GitHub (kiem tra mang internet). Chi tiet: $_" }
 
-Step "2/5 Giai nen va kiem tra..."
+Step "2/6 Giai nen va kiem tra..."
 try { Expand-Archive -Path $Zip -DestinationPath $Tmp -Force }
 catch { Fail "Giai nen that bai. Chi tiet: $_" }
 $Extracted = Get-ChildItem -LiteralPath $Tmp -Directory | Select-Object -First 1
@@ -40,7 +40,7 @@ if (-not $Extracted -or -not (Test-Path (Join-Path $Extracted.FullName 'src\cao_
     Fail "File tai ve khong dung cau truc code. Khong thay doi gi tren may."
 }
 
-Step "3/5 Tat Claude Desktop va server cu..."
+Step "3/6 Tat Claude Desktop va server cu..."
 $ClaudeExe = (Get-Process -Name claude -ErrorAction SilentlyContinue | Where-Object Path | Select-Object -First 1).Path
 # Co tien trinh "claude" chay quyen he thong (Access denied) - khong can tat, bo qua.
 Get-Process -Name claude -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
@@ -54,11 +54,11 @@ if (Get-Process -Name claude -ErrorAction SilentlyContinue | Where-Object Path) 
     Read-Host | Out-Null
 }
 
-Step "4/5 Chep code moi de len code cu (giu nguyen .venv va .env)..."
+Step "4/6 Chep code moi de len code cu (giu nguyen .venv va .env)..."
 robocopy $Extracted.FullName $ProjectDir /E /XD .venv .update-tmp /XF .env /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { Fail "Chep file that bai (robocopy ma loi $LASTEXITCODE)." }
 
-Step "5/5 Cap nhat thu vien (neu co thu vien moi)..."
+Step "5/6 Cap nhat thu vien (neu co thu vien moi)..."
 # pip in canh bao ra stderr; khong de canh bao do bi coi la loi chet.
 $ErrorActionPreference = 'Continue'
 & $Python -m pip install -e $ProjectDir --quiet --disable-pip-version-check
@@ -67,6 +67,14 @@ $ErrorActionPreference = 'Stop'
 if ($PipExit -ne 0) { Fail "Code moi da chep xong nhung cai thu vien that bai. Chup man hinh cua so nay gui lai." }
 
 try { Remove-Dir $Tmp } catch { }
+
+Step "6/6 Tu sua duong dan trong cau hinh Claude Desktop (phong khi thu muc da bi doi ten/di chuyen)..."
+try {
+    & (Join-Path $PSScriptRoot 'fix_mcp_config.ps1')
+} catch {
+    Write-Host "Khong tu sua duoc cau hinh Claude Desktop (co the file cau hinh chua ton tai lan dau). Chi tiet: $_" -ForegroundColor Yellow
+    Write-Host "Neu day la lan dau cai dat, vao Settings > Developer > Edit config de them thu cong theo huong dan trong README." -ForegroundColor Yellow
+}
 
 Write-Host "`nCAP NHAT XONG." -ForegroundColor Green
 if ($ClaudeExe) {
