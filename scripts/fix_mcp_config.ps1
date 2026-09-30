@@ -19,29 +19,44 @@ if (-not $ProjectDir) {
 }
 $Python = Join-Path $ProjectDir '.venv\Scripts\python.exe'
 
-Step "1/3 Kiem tra python.exe cua du an..."
+Step "1/4 Kiem tra python.exe cua du an..."
 if (-not (Test-Path $Python)) {
     Fail "Khong thay $Python. Thu muc .venv co the da bi xoa - can cai lai tu dau, khong chi sua duong dan."
 }
 Write-Host "Dung: $Python" -ForegroundColor Green
 
-Step "2/3 Tim file cau hinh Claude Desktop..."
+Step "2/4 Dang ky lai code voi Python (pip install -e)..."
+# `pip install -e` luu duong dan TUYET DOI toi thu muc src/ vao ben trong
+# .venv. Di chuyen/doi ten thu muc du an lam duong dan do thanh sai cho -
+# python -m cao_anh_ref.server se bao ModuleNotFoundError va thoat ngay,
+# Claude Desktop hien thanh "Server disconnected" chu khong phai loi duong
+# dan nua. Chay lai lenh nay tai vi tri hien tai la sua dut diem.
+$ErrorActionPreference = 'Continue'
+& $Python -m pip install -e $ProjectDir --quiet --disable-pip-version-check
+$PipExit = $LASTEXITCODE
+$ErrorActionPreference = 'Stop'
+if ($PipExit -ne 0) {
+    Fail "Dang ky lai code voi pip that bai (exit code $PipExit). Chup man hinh cua so nay gui lai."
+}
+Write-Host "Da dang ky lai." -ForegroundColor Green
+
+Step "3/4 Tim file cau hinh Claude Desktop..."
 $ConfigFilename = 'claude_desktop_config.json'
+# Bien moi truong nay luon co san tren Windows that, nhung phong khi rong
+# (moi truong toi gian/khac thuong) thi bo qua thay vi lam Join-Path crash.
+$AppDataRoots = @($env:APPDATA, $env:LOCALAPPDATA) | Where-Object { $_ }
 if (-not $ConfigPath) {
     # Vi tri thong thuong.
-    $Candidates = @(
-        (Join-Path $env:APPDATA "Claude\$ConfigFilename"),
-        (Join-Path $env:LOCALAPPDATA "Claude\$ConfigFilename"),
-        (Join-Path $env:APPDATA "AnthropicClaude\$ConfigFilename"),
-        (Join-Path $env:LOCALAPPDATA "AnthropicClaude\$ConfigFilename")
-    )
+    $Candidates = $AppDataRoots | ForEach-Object {
+        (Join-Path $_ "Claude\$ConfigFilename"), (Join-Path $_ "AnthropicClaude\$ConfigFilename")
+    }
     $ConfigPath = $Candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
 if (-not $ConfigPath) {
     # Ban cai tu Microsoft Store bi "ao hoa" AppData vao %LOCALAPPDATA%\Packages\<ten-goi>\...
     # Chi do vao cac goi co ten lien quan Claude/Anthropic, khong quet toan bo Packages (rat nhieu goi khac, se cham).
-    $PackagesDir = Join-Path $env:LOCALAPPDATA 'Packages'
-    if (Test-Path $PackagesDir) {
+    $PackagesDir = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Packages' } else { $null }
+    if ($PackagesDir -and (Test-Path $PackagesDir)) {
         $ClaudePackages = Get-ChildItem -Path $PackagesDir -Directory -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -like '*Claude*' -or $_.Name -like '*Anthropic*' }
         foreach ($pkg in $ClaudePackages) {
@@ -51,15 +66,15 @@ if (-not $ConfigPath) {
     }
 }
 if (-not $ConfigPath) {
-    # Tim rong o 2 goc quen thuoc, gioi han do sau de khong quet lan sang cac thu muc lon khong lien quan.
-    $ConfigPath = @($env:APPDATA, $env:LOCALAPPDATA) | Where-Object { $_ } | ForEach-Object {
+    # Tim rong o cac goc quen thuoc, gioi han do sau de khong quet lan sang cac thu muc lon khong lien quan.
+    $ConfigPath = $AppDataRoots | ForEach-Object {
         Get-ChildItem -Path $_ -Filter $ConfigFilename -Recurse -Depth 3 -ErrorAction SilentlyContinue
     } | Select-Object -First 1 -ExpandProperty FullName
 }
 
 if (-not $ConfigPath -or -not (Test-Path $ConfigPath)) {
     Write-Host "`nKhong tu tim thay file cau hinh. Cac thu muc co ten chua 'claude' tim duoc:" -ForegroundColor Yellow
-    $Found = @($env:APPDATA, $env:LOCALAPPDATA) | Where-Object { $_ } | ForEach-Object {
+    $Found = $AppDataRoots | ForEach-Object {
         Get-ChildItem -Path $_ -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*claude*' }
     }
     if ($Found) { $Found | ForEach-Object { Write-Host " - $($_.FullName)" } }
@@ -68,7 +83,7 @@ if (-not $ConfigPath -or -not (Test-Path $ConfigPath)) {
 }
 Write-Host "Dung: $ConfigPath" -ForegroundColor Green
 
-Step "3/3 Cap nhat muc cao-anh-ref (giu nguyen cac MCP server khac)..."
+Step "4/4 Cap nhat muc cao-anh-ref (giu nguyen cac MCP server khac)..."
 $Backup = "$ConfigPath.bak"
 Copy-Item -LiteralPath $ConfigPath -Destination $Backup -Force
 
