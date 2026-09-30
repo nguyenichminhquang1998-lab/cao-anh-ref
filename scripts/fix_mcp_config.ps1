@@ -1,14 +1,22 @@
-param([string]$ConfigPath)
+param([string]$ConfigPath, [string]$ProjectDir)
 
 $ErrorActionPreference = 'Stop'
 
 function Step($msg) { Write-Host "`n>> $msg" -ForegroundColor Cyan }
 function Fail($msg) { Write-Host "`nLOI: $msg" -ForegroundColor Red; throw 'Dung sua config.' }
 
-# Tu do vi tri that cua chinh script nay ($PSScriptRoot), khong dung duong dan
-# co san nao khac - nen du sau nay thu muc cao-anh-ref bi doi ten/di chuyen di
-# dau, chi can chay lai script nay (vd qua update.bat) la config luon dung.
-$ProjectDir = Split-Path -Parent $PSScriptRoot
+# Uu tien -ProjectDir neu XQuang truyen thang (vd dan lenh vao PowerShell -
+# luc do script chay tu bo nho, khong co file that nen khong tu do duoc).
+# Neu khong truyen, thu tu do vi tri that cua chinh script nay ($PSScriptRoot)
+# - dung khi script nam san trong thu muc du an (vd update_windows.ps1 goi no
+# o buoc cuoi): du sau nay thu muc bi doi ten/di chuyen di dau, chi can chay
+# lai la config luon dung.
+if (-not $ProjectDir) {
+    if (-not $PSScriptRoot) {
+        Fail "Khong tu xac dinh duoc thu muc du an (script dang chay truc tiep tu bo nho, khong phai tu file). Hay them '-ProjectDir ''duong dan toi thu muc cao-anh-ref-...''' vao cuoi lenh roi chay lai."
+    }
+    $ProjectDir = Split-Path -Parent $PSScriptRoot
+}
 $Python = Join-Path $ProjectDir '.venv\Scripts\python.exe'
 
 Step "1/3 Kiem tra python.exe cua du an..."

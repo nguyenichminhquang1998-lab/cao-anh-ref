@@ -70,7 +70,7 @@ try { Remove-Dir $Tmp } catch { }
 
 Step "6/6 Tu sua duong dan trong cau hinh Claude Desktop (phong khi thu muc da bi doi ten/di chuyen)..."
 try {
-    & (Join-Path $PSScriptRoot 'fix_mcp_config.ps1')
+    & (Join-Path $PSScriptRoot 'fix_mcp_config.ps1') -ProjectDir $ProjectDir
 } catch {
     Write-Host "Khong tu sua duoc cau hinh Claude Desktop (co the file cau hinh chua ton tai lan dau). Chi tiet: $_" -ForegroundColor Yellow
     Write-Host "Neu day la lan dau cai dat, vao Settings > Developer > Edit config de them thu cong theo huong dan trong README." -ForegroundColor Yellow
